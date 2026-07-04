@@ -4,7 +4,7 @@ FROM python:3.11-slim AS builder
 WORKDIR /app
 
 # Copy requirements file
-COPY services/analytics-service/requirements.txt .
+COPY requirements.txt .
 
 # Install dependencies to a local directory
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
@@ -21,7 +21,7 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 # Copy the application code
-COPY services/analytics-service/ .
+COPY . .
 
 # Change ownership
 RUN chown -R appuser:appgroup /app
