@@ -13,6 +13,7 @@ addopts = "-ra -q --cov=. --cov-report=term-missing --cov-report=xml"
 testpaths = [
     "tests",
 ]
+pythonpath = ["."]
 
 [tool.coverage.run]
 source = ["."]
