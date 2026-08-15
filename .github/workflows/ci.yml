@@ -1,0 +1,40 @@
+name: Analytics Service CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+
+concurrency:
+  group: analytics-service-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 1. Qualidade de Código (Lint & Testes)
+  quality:
+    name: Code Quality & Unit Tests
+    uses: oseiasal/.github/.github/workflows/reusable-python-quality.yml@main
+    with:
+      python-version: '3.11'
+
+  # 2. Varredura de Segurança (SAST Bandit & SCA Trivy com bloqueio em CRITICAL)
+  security:
+    name: DevSecOps Security Analysis
+    needs: quality
+    uses: oseiasal/.github/.github/workflows/reusable-security.yml@main
+    with:
+      language: 'python'
+      python-version: '3.11'
+      trivy-severity: 'CRITICAL,HIGH'
+      fail-on-critical: true
+
+  # 3. Build do Container Docker
+  build:
+    name: Docker Container Build
+    needs: security
+    uses: oseiasal/.github/.github/workflows/reusable-build.yml@main
+    with:
+      dockerfile-path: 'Dockerfile.analytics'
+      image-name: 'analytics-service'
+      push-image: false
