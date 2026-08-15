@@ -67,7 +67,7 @@ gunicorn --bind 0.0.0.0:8005 app:app
 ```
 O servidor estará rodando em `http://localhost:8005`. Você verá logs no terminal assim que o worker SQS iniciar e (eventualmente) processar mensagens.
 
-## 🧪 Testando o Serviço
+## Testando o Serviço
 
 Testar este serviço é diferente. Você não vai chamar uma API dele.
 
