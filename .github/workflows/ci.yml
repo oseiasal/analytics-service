@@ -3,6 +3,7 @@ name: Analytics Service CI Pipeline
 on:
   pull_request:
     branches: [ develop, dev, main, master ]
+  workflow_dispatch:
 
 concurrency:
   group: ci-analytics-${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -10,7 +11,7 @@ concurrency:
 
 jobs:
   # 1. Qualidade de Código & Testes Unitários
-  # Executado em todos os Pull Requests
+  # Executado em todos os Pull Requests e disparos manuais
   quality:
     name: Code Quality & Unit Tests
     uses: oseiasal/.github/.github/workflows/reusable-python-quality.yml@main
@@ -18,11 +19,14 @@ jobs:
       python-version: '3.11'
 
   # 2. Segurança DevSecOps (SAST Bandit & SCA Trivy)
-  # Executado em Pull Requests direcionados para a main/master
+  # Executado em PRs para main/master e disparos manuais
   security:
     name: DevSecOps Security Analysis
     needs: quality
-    if: github.base_ref == 'main' || github.base_ref == 'master'
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.base_ref == 'main' ||
+      github.base_ref == 'master'
     uses: oseiasal/.github/.github/workflows/reusable-security.yml@main
     with:
       language: 'python'
