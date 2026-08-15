@@ -1,0 +1,23 @@
+name: DevSecOps Security Scan
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+  schedule:
+    - cron: '0 4 * * 1' # Executa semanalmente toda segunda-feira às 04:00 UTC
+
+concurrency:
+  group: security-scan-analytics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    name: DevSecOps Security Analysis (SAST Bandit & SCA Trivy)
+    uses: oseiasal/.github/.github/workflows/reusable-security.yml@main
+    with:
+      language: 'python'
+      python-version: '3.11'
+      trivy-severity: 'CRITICAL,HIGH'
+      fail-on-critical: true
