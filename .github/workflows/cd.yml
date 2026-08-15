@@ -1,0 +1,47 @@
+name: Analytics Service CD Pipeline (Deploy ECR)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-analytics-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # 1. Quality Gate antes do Deploy
+  quality:
+    name: Quality Gate (Lint & Tests)
+    uses: oseiasal/.github/.github/workflows/reusable-python-quality.yml@main
+    with:
+      python-version: '3.11'
+
+  # 2. Security Gate antes do Deploy (SAST & SCA)
+  security:
+    name: Security Gate (SAST & SCA)
+    needs: quality
+    uses: oseiasal/.github/.github/workflows/reusable-security.yml@main
+    with:
+      language: 'python'
+      python-version: '3.11'
+      trivy-severity: 'CRITICAL,HIGH'
+      fail-on-critical: true
+
+  # 3. Docker Build & Push para Amazon ECR
+  deploy:
+    name: Docker Build & ECR Push
+    needs: [quality, security]
+    uses: oseiasal/.github/.github/workflows/reusable-docker-push.yml@main
+    with:
+      image-name: 'analytics-service'
+      dockerfile-path: 'Dockerfile.analytics'
+      aws-region: 'us-east-1'
+      push-image: true
+      tag-latest: true
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
