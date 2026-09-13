@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 # Ensure environment variables are set before app module loads
 os.environ["AWS_REGION"] = "us-east-1"
 os.environ["AWS_SQS_URL"] = "http://localhost:4566/000000000000/analytics-queue"
-os.environ["AWS_DYNAMODB_TABLE"] = "analytics_events"
+os.environ["AWS_DYNAMODB_TABLE"] = "ToggleMasterAnalytics"
 os.environ["AWS_ENDPOINT_URL"] = "http://localhost:4566"
 
 # Create mock for boto3 and botocore if not installed
