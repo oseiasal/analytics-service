@@ -9,6 +9,7 @@ import boto3
 from botocore.exceptions import NoCredentialsError, ClientError
 from flask import Flask, jsonify
 from dotenv import load_dotenv
+from telemetry import init_telemetry
 
 # Configura o logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -42,14 +43,23 @@ except Exception as e:
     log.critical(f"Erro ao inicializar o Boto3: {e}")
     sys.exit(1)
 
+# --- Servidor Flask & OpenTelemetry ---
+app = Flask(__name__)
+telemetry = init_telemetry(app, "analytics-service")
+
 
 # --- SQS Worker ---
 
 def process_message(message):
-    """ Processa uma única mensagem SQS e a insere no DynamoDB """
+    """ Processa uma única mensagem SQS e a insere no DynamoDB (propagando Distributed Trace W3C) """
+    start_time = time.time()
+    msg_attrs = message.get("MessageAttributes") or {}
+    traceparent = msg_attrs.get("traceparent", {}).get("StringValue", "")
+    flag_name = "unknown"
     try:
-        log.info(f"Processando mensagem ID: {message['MessageId']}")
+        log.info(f"Processando mensagem ID: {message['MessageId']} (traceparent={traceparent})")
         body = json.loads(message['Body'])
+        flag_name = body.get('flag_name', 'unknown')
         
         # Gera um ID único para o item no DynamoDB
         event_id = str(uuid.uuid4())
@@ -76,15 +86,43 @@ def process_message(message):
             QueueUrl=SQS_QUEUE_URL,
             ReceiptHandle=message['ReceiptHandle']
         )
+        telemetry.record_sqs_consumer_span(
+            traceparent=traceparent,
+            flag_name=flag_name,
+            start_time=start_time,
+            end_time=time.time(),
+            is_error=False,
+        )
         
     except json.JSONDecodeError:
         log.error(f"Erro ao decodificar JSON da mensagem ID: {message['MessageId']}")
+        telemetry.record_sqs_consumer_span(
+            traceparent=traceparent,
+            flag_name=flag_name,
+            start_time=start_time,
+            end_time=time.time(),
+            is_error=True,
+        )
         # Não deleta a mensagem, pode ser uma "poison pill"
     except ClientError as e:
         log.error(f"Erro do Boto3 (DynamoDB ou SQS) ao processar {message['MessageId']}: {e}")
+        telemetry.record_sqs_consumer_span(
+            traceparent=traceparent,
+            flag_name=flag_name,
+            start_time=start_time,
+            end_time=time.time(),
+            is_error=True,
+        )
         # Não deleta a mensagem, tenta novamente
     except Exception as e:
         log.error(f"Erro inesperado ao processar {message['MessageId']}: {e}")
+        telemetry.record_sqs_consumer_span(
+            traceparent=traceparent,
+            flag_name=flag_name,
+            start_time=start_time,
+            end_time=time.time(),
+            is_error=True,
+        )
         # Não deleta a mensagem, tenta novamente
 
 def sqs_worker_loop():
@@ -92,11 +130,12 @@ def sqs_worker_loop():
     log.info("Iniciando o worker SQS...")
     while True:
         try:
-            # Long-polling: espera até 20s por mensagens
+            # Long-polling: espera até 20s por mensagens (incluindo MessageAttributes para Distributed Tracing)
             response = sqs_client.receive_message(
                 QueueUrl=SQS_QUEUE_URL,
                 MaxNumberOfMessages=10,  # Processa em lotes de até 10
-                WaitTimeSeconds=20
+                WaitTimeSeconds=20,
+                MessageAttributeNames=['All']
             )
             
             messages = response.get('Messages', [])
@@ -115,10 +154,6 @@ def sqs_worker_loop():
         except Exception as e:
             log.error(f"Erro inesperado no loop principal do SQS: {e}")
             time.sleep(10)
-
-# --- Servidor Flask (Apenas para Health Check) ---
-
-app = Flask(__name__)
 
 @app.route('/health')
 def health():

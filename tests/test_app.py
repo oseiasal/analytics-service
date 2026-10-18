@@ -58,3 +58,29 @@ def test_process_message_invalid_json(mock_aws):
     # Não deve inserir nem deletar mensagem inválida
     mock_dynamo.put_item.assert_not_called()
     mock_sqs.delete_message.assert_not_called()
+
+
+def test_process_message_with_traceparent_and_metrics(client, mock_aws):
+    message_payload = {
+        "user_id": "user-456",
+        "flag_name": "checkout-v2",
+        "result": False,
+        "timestamp": "2026-10-18T12:00:00Z",
+    }
+    message = {
+        "MessageId": "msg-otel-001",
+        "Body": json.dumps(message_payload),
+        "ReceiptHandle": "receipt-handle-otel-001",
+        "MessageAttributes": {
+            "traceparent": {
+                "DataType": "String",
+                "StringValue": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            }
+        },
+    }
+    flask_app_module.process_message(message)
+
+    res_metrics = client.get("/metrics")
+    assert res_metrics.status_code == 200
+    assert b"sqs_messages_processed_total" in res_metrics.data
+
