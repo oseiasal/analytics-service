@@ -7,10 +7,15 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install dependencies to a local directory
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" "wheel>=0.46.2" "jaraco.context>=6.1.0" && \
+    pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # --- Final Stage ---
 FROM python:3.11-slim
+
+# Upgrade bundled Python packaging tools to patch CVE-2026-24049 (wheel) and CVE-2026-23949 (jaraco.context)
+RUN pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" "wheel>=0.46.2" "jaraco.context>=6.1.0" && \
+    rm -rf /usr/local/lib/python*/site-packages/setuptools/_vendor/jaraco.context*
 
 # Create a non-root user and group
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser

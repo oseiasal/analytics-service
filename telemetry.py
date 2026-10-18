@@ -43,20 +43,14 @@ class OTelInstrumentor:
 
         try:
             from opentelemetry import trace
-            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-                OTLPSpanExporter,
-            )
             from opentelemetry.instrumentation.botocore import BotocoreInstrumentor
             from opentelemetry.instrumentation.flask import FlaskInstrumentor
             from opentelemetry.instrumentation.logging import LoggingInstrumentor
             from opentelemetry.sdk.resources import Resource
             from opentelemetry.sdk.trace import TracerProvider
-            from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
             resource = Resource.create({"service.name": self.service_name})
             provider = TracerProvider(resource=resource)
-            exporter = OTLPSpanExporter(endpoint=f"{self.otlp_endpoint}/v1/traces")
-            provider.add_span_processor(BatchSpanProcessor(exporter))
             trace.set_tracer_provider(provider)
 
             FlaskInstrumentor().instrument_app(app)
